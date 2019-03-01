@@ -1,0 +1,86 @@
+#!/usr/bin/python3
+# Chido Nguyen
+# Project 1 : CS372 Chatclient + Chatserver
+# nguychid@oregonstate.edu 931506965
+# This is the chat server. Hard code handle to CHAT_BOT >
+# Will sit and  wait for connection from client and then let client talk first then exchange messages
+
+from socket import *
+import sys
+import signal
+#https://docs.python.org/3/tutorial/index.html
+#global variables to "check" for handshake keys
+SECRET = "HANDSHAKE"
+PRIVATE = "HIGHFIVE"
+HANDLE = "CHAT_BOT >"
+
+#https://stackoverflow.com/questions/1112343/how-do-i-capture-sigint-in-python
+def signal_ctrlc(signal,frame):
+	print("Exit Signal Received")
+	sys.exit(0)
+
+
+# Function sits and waits for client to connect and send it the secret pass phrase
+# If password matches server sends its own private keys
+# client sends back OK if the server key is okay
+def handshake(socket):							#https://anh.cs.luc.edu/python/hands-on/3.1/handsonHtml/functions.html
+	secret_check = (socket.recv(9)).decode()	#http://thepythonguru.com/python-strings/
+												#https://stackoverflow.com/questions/37016946/remove-b-character-do-in-front-of-a-string-literal-in-python-3
+	if secret_check != SECRET:
+		return 1
+	#if first handshake works reply with private keys
+	socket.send((PRIVATE).encode())				#https://stackoverflow.com/questions/5471158/typeerror-str-does-not-support-the-buffer-interface
+	confirm = (socket.recv(64)).decode()
+	if confirm != "OK":
+		return 1
+	return 0
+
+#Server Message In take from Client
+def inbox(connectionSocket):
+	tmp = (connectionSocket.recv(1024)).decode()
+	return tmp
+
+#Server Outbox: Sends messages to client
+def outbox(connectionSocket,sentence):
+	print(sentence)
+	message=input(HANDLE)
+	combined_mess= HANDLE + message
+	connectionSocket.send(combined_mess.encode())
+	if(message == '\quit'):
+		return '\quit'
+	else:
+		return ''
+	
+
+def main():
+	signal.signal(signal.SIGINT, signal_ctrlc)
+	serverPort = int(sys.argv[1]) 		#http://www.pythonforbeginners.com/system/python-sys-argv
+	serverSocket = socket(AF_INET,SOCK_STREAM)
+	serverSocket.bind(('',serverPort))
+	serverSocket.listen(1)
+	print ('The server is ready to receive')
+	while 1:
+
+		connectionSocket, addr = serverSocket.accept()
+		# client_hand_count = (connectionSocket.recv(4))#https://stackoverflow.com/questions/4735566/python-unicode-problem
+		#this was me trying to splice out the user handle sent with the message and then find \quit
+		# print(type(client_hand_count))
+		# print(client_hand_count)
+		# client_hand_count = client_hand_count.decode('utf-16')
+		# print(client_hand_count)
+		# x = int(client_hand_count)
+		status = handshake(connectionSocket)
+		if status == 0:
+			ex_code = ''
+			while(ex_code != '\quit'):
+
+				sentence = inbox(connectionSocket)
+				#exit_check = sentence[x:]
+				if '\quit' in sentence:				# I tried desperately to find out why my decode wasn't working, only to be told by a fellow classmate Alex J. that I can find substring via this method.
+					print('User has disconnected')
+					ex_code = '\quit'
+				else:
+						ex_code = outbox(connectionSocket,sentence)
+		connectionSocket.close()
+		
+main()
